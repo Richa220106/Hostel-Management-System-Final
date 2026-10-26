@@ -1,6 +1,8 @@
 package com.hostelhub.proxy;
 
+import com.hostelhub.builder.ComplaintBuilder;
 import com.hostelhub.factory.Complaint;
+import com.hostelhub.memento.ComplaintHistory;
 import com.hostelhub.model.Notification;
 import com.hostelhub.model.Room;
 import com.hostelhub.model.Technician;
@@ -53,6 +55,14 @@ public class HostelServiceProxy implements HostelService {
         return realService.createComplaint(complaint);
     }
 
+    /**
+     * Builder Pattern overload: builds the Complaint and delegates to createComplaint(Complaint).
+     */
+    @Override
+    public Complaint createComplaint(ComplaintBuilder builder) {
+        return createComplaint(builder.build());
+    }
+
     @Override
     public List<Complaint> getComplaints() {
         if (!isAuthenticated()) {
@@ -90,6 +100,29 @@ public class HostelServiceProxy implements HostelService {
             throw new SecurityException("Access Denied: Only Wardens can assign technicians.");
         }
         realService.assignTechnician(complaintId, technicianId);
+    }
+
+    /**
+     * Memento Pattern: Only Wardens can restore complaint status.
+     */
+    @Override
+    public Complaint restoreComplaintStatus(int complaintId) {
+        if (!isWarden()) {
+            System.err.println("Proxy Security Violation: Student attempted to restore complaint status!");
+            throw new SecurityException("Access Denied: Only Wardens can restore complaint status.");
+        }
+        return realService.restoreComplaintStatus(complaintId);
+    }
+
+    /**
+     * Memento Pattern: Expose complaint history (Warden only).
+     */
+    @Override
+    public ComplaintHistory getComplaintHistory() {
+        if (!isWarden()) {
+            throw new SecurityException("Access Denied: Only Wardens can view complaint history.");
+        }
+        return realService.getComplaintHistory();
     }
 
     @Override
