@@ -1,7 +1,10 @@
 package com.hostelhub.proxy;
 
+import com.hostelhub.builder.ComplaintBuilder;
 import com.hostelhub.db.DatabaseUtil;
 import com.hostelhub.factory.Complaint;
+import com.hostelhub.memento.ComplaintHistory;
+import com.hostelhub.memento.ComplaintMemento;
 import com.hostelhub.model.Notification;
 import com.hostelhub.model.Room;
 import com.hostelhub.model.Technician;
@@ -18,6 +21,9 @@ import java.util.List;
 
 public class RealHostelService implements HostelService {
     private User currentUser;
+
+    // Memento Pattern: Caretaker — holds complaint state history
+    private final ComplaintHistory complaintHistory = new ComplaintHistory();
 
     public RealHostelService() {}
 
@@ -38,6 +44,14 @@ public class RealHostelService implements HostelService {
     public Complaint createComplaint(Complaint complaint) {
         System.out.println("RealHostelService: Routing complaint to Central HostelHub System...");
         return HostelManagementSystem.getInstance().processNewComplaint(complaint);
+    }
+
+    /**
+     * Builder Pattern overload: accepts a ComplaintBuilder and builds the Complaint before processing.
+     */
+    @Override
+    public Complaint createComplaint(ComplaintBuilder builder) {
+        return createComplaint(builder.build());
     }
 
     @Override
@@ -126,13 +140,29 @@ public class RealHostelService implements HostelService {
         System.out.println("RealHostelService: Updating complaint #" + complaintId + " status to " + status);
         int studentId = 0;
         try (Connection conn = DatabaseUtil.getConnection()) {
-            // Get studentId first
-            String findSql = "SELECT student_id FROM Complaints WHERE id = ?";
+            // Get current complaint state BEFORE update — for Memento snapshot
+            String findSql = "SELECT c.*, t.name as technician_name FROM Complaints c " +
+                             "LEFT JOIN Technicians t ON c.technician_id = t.id WHERE c.id = ?";
             try (PreparedStatement findStmt = conn.prepareStatement(findSql)) {
                 findStmt.setInt(1, complaintId);
                 ResultSet rs = findStmt.executeQuery();
                 if (rs.next()) {
                     studentId = rs.getInt("student_id");
+                    // Memento Pattern: save state BEFORE the update
+                    Complaint snapshot = new Complaint();
+                    snapshot.setId(complaintId);
+                    snapshot.setStudentId(studentId);
+                    snapshot.setStatus(rs.getString("status"));
+                    snapshot.setTechnicianId(rs.getInt("technician_id"));
+                    snapshot.setTechnicianName(rs.getString("technician_name"));
+                    snapshot.setDepartment(rs.getString("department"));
+                    snapshot.setDescription(rs.getString("description"));
+                    snapshot.setPriority(rs.getString("priority"));
+                    snapshot.setUpdatedAt(rs.getTimestamp("updated_at"));
+                    ComplaintMemento memento = snapshot.saveState();
+                    complaintHistory.push(memento);
+                    System.out.println("RealHostelService: Saved memento for Complaint #" + complaintId +
+                            " [Status: " + memento.getStatus() + "]");
                 }
             }
 
@@ -160,6 +190,71 @@ public class RealHostelService implements HostelService {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Memento Pattern: Restores a complaint to its most recent saved state.
+     */
+    @Override
+    public Complaint restoreComplaintStatus(int complaintId) {
+        ComplaintMemento memento = complaintHistory.pop(complaintId);
+        if (memento == null) {
+            System.out.println("RealHostelService: No history found for Complaint #" + complaintId);
+            return getComplaintById(complaintId);
+        }
+        System.out.println("RealHostelService: Restoring Complaint #" + complaintId +
+                " to previous state: " + memento);
+
+        int studentId = 0;
+        try (Connection conn = DatabaseUtil.getConnection()) {
+            // Restore status in DB
+            String sql = "UPDATE Complaints SET status = ?, technician_id = ?, department = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, memento.getStatus());
+                if (memento.getTechnicianId() > 0) {
+                    stmt.setInt(2, memento.getTechnicianId());
+                } else {
+                    stmt.setNull(2, java.sql.Types.INTEGER);
+                }
+                stmt.setString(3, memento.getDepartment());
+                stmt.setInt(4, complaintId);
+                stmt.executeUpdate();
+            }
+
+            // Re-assign technician if restored to non-resolved state
+            if (memento.getTechnicianId() > 0 && !"RESOLVED".equalsIgnoreCase(memento.getStatus())) {
+                String techSql = "UPDATE Technicians SET status = 'ASSIGNED' WHERE id = ?";
+                try (PreparedStatement tStmt = conn.prepareStatement(techSql)) {
+                    tStmt.setInt(1, memento.getTechnicianId());
+                    tStmt.executeUpdate();
+                }
+            }
+
+            // Get studentId for observer notification
+            String sidSql = "SELECT student_id FROM Complaints WHERE id = ?";
+            try (PreparedStatement sidStmt = conn.prepareStatement(sidSql)) {
+                sidStmt.setInt(1, complaintId);
+                ResultSet rs = sidStmt.executeQuery();
+                if (rs.next()) studentId = rs.getInt("student_id");
+            }
+
+            // Observer notification for restoration
+            HostelManagementSystem.getInstance().getComplaintManager().onComplaintStatusChanged(
+                    complaintId, memento.getStatus(), studentId,
+                    "Complaint #" + complaintId + " status restored to: " + memento.getStatus()
+            );
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return getComplaintById(complaintId);
+    }
+
+    /**
+     * Memento Pattern: Returns the complaint history caretaker.
+     */
+    @Override
+    public ComplaintHistory getComplaintHistory() {
+        return complaintHistory;
     }
 
     @Override

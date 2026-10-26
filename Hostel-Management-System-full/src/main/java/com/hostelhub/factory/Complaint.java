@@ -1,5 +1,8 @@
 package com.hostelhub.factory;
 
+import com.hostelhub.builder.ComplaintBuilder;
+import com.hostelhub.memento.ComplaintMemento;
+
 import java.sql.Timestamp;
 
 public class Complaint {
@@ -73,4 +76,46 @@ public class Complaint {
 
     public Timestamp getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Timestamp updatedAt) { this.updatedAt = updatedAt; }
+
+    // -------------------------------------------------------
+    // Builder Pattern integration
+    // -------------------------------------------------------
+    /**
+     * Returns a new ComplaintBuilder for fluent complaint construction.
+     */
+    public static ComplaintBuilder builder() {
+        return new ComplaintBuilder();
+    }
+
+    // -------------------------------------------------------
+    // Memento Pattern integration (Originator role)
+    // -------------------------------------------------------
+    /**
+     * Creates and returns a snapshot (memento) of this complaint's current state.
+     */
+    public ComplaintMemento saveState() {
+        return new ComplaintMemento(
+                this.id,
+                this.status,
+                this.technicianId,
+                this.technicianName,
+                this.department,
+                this.description,
+                this.priority,
+                this.updatedAt
+        );
+    }
+
+    /**
+     * Restores this complaint's state from the given memento snapshot.
+     */
+    public void restoreState(ComplaintMemento memento) {
+        if (memento == null) return;
+        this.status = memento.getStatus();
+        this.technicianId = memento.getTechnicianId();
+        this.technicianName = memento.getTechnicianName();
+        if (memento.getDepartment() != null) this.department = memento.getDepartment();
+        if (memento.getDescription() != null) this.description = memento.getDescription();
+        if (memento.getPriority() != null) this.priority = memento.getPriority();
+    }
 }

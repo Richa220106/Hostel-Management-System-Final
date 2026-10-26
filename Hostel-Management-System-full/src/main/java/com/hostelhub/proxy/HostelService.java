@@ -1,6 +1,8 @@
 package com.hostelhub.proxy;
 
+import com.hostelhub.builder.ComplaintBuilder;
 import com.hostelhub.factory.Complaint;
+import com.hostelhub.memento.ComplaintHistory;
 import com.hostelhub.model.Notification;
 import com.hostelhub.model.Room;
 import com.hostelhub.model.Technician;
@@ -15,13 +17,18 @@ public interface HostelService {
 
     // Complaint operations
     Complaint createComplaint(Complaint complaint);
+    Complaint createComplaint(ComplaintBuilder builder);   // Builder overload
     List<Complaint> getComplaints();
     Complaint getComplaintById(int id);
-    
+
     // Warden-only complaint actions
     void updateComplaintStatus(int complaintId, String status);
     void assignTechnician(int complaintId, int technicianId);
-    
+
+    // Memento: restore and history (Warden only)
+    Complaint restoreComplaintStatus(int complaintId);
+    ComplaintHistory getComplaintHistory();
+
     // Room operations
     List<Room> getRooms();
     void allocateRoom(int studentId, String roomNo);
