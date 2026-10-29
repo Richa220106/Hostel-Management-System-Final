@@ -10,7 +10,9 @@ import com.hostelhub.model.Room;
 import com.hostelhub.model.Technician;
 import com.hostelhub.model.User;
 import com.hostelhub.model.Visitor;
+import com.hostelhub.prototype.ComplaintPrototypeRegistry;
 import com.hostelhub.singleton.HostelManagementSystem;
+import com.hostelhub.strategy.TechnicianAssignmentStrategy;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -52,6 +54,40 @@ public class RealHostelService implements HostelService {
     @Override
     public Complaint createComplaint(ComplaintBuilder builder) {
         return createComplaint(builder.build());
+    }
+
+    // -------------------------------------------------------
+    // Prototype Pattern implementation
+    // -------------------------------------------------------
+    @Override
+    public Complaint createComplaintFromTemplate(String templateKey, String customNote) {
+        ComplaintPrototypeRegistry registry = HostelManagementSystem.getInstance().getPrototypeRegistry();
+        int studentId = currentUser != null ? currentUser.getId() : 2;
+        String roomNo = currentUser != null && currentUser.getRoomNo() != null ? currentUser.getRoomNo() : "";
+        Complaint clone = registry.createFromTemplate(templateKey, studentId, roomNo, customNote);
+        return createComplaint(clone);
+    }
+
+    @Override
+    public Complaint cloneComplaint(int complaintId, String customNote) {
+        Complaint original = getComplaintById(complaintId);
+        if (original == null) {
+            throw new IllegalArgumentException("Cannot clone non-existent complaint #" + complaintId);
+        }
+        int studentId = currentUser != null ? currentUser.getId() : original.getStudentId();
+        String roomNo = currentUser != null && currentUser.getRoomNo() != null ? currentUser.getRoomNo() : original.getRoomNo();
+        Complaint clone = original.cloneWith(studentId, roomNo, customNote);
+        return createComplaint(clone);
+    }
+
+    @Override
+    public List<String> getAvailableComplaintTemplates() {
+        return HostelManagementSystem.getInstance().getPrototypeRegistry().getAvailableTemplateKeys();
+    }
+
+    @Override
+    public ComplaintPrototypeRegistry getPrototypeRegistry() {
+        return HostelManagementSystem.getInstance().getPrototypeRegistry();
     }
 
     @Override
@@ -255,6 +291,19 @@ public class RealHostelService implements HostelService {
     @Override
     public ComplaintHistory getComplaintHistory() {
         return complaintHistory;
+    }
+
+    // -------------------------------------------------------
+    // Strategy Pattern implementation
+    // -------------------------------------------------------
+    @Override
+    public void setTechnicianAssignmentStrategy(TechnicianAssignmentStrategy strategy) {
+        HostelManagementSystem.getInstance().setTechnicianAssignmentStrategy(strategy);
+    }
+
+    @Override
+    public TechnicianAssignmentStrategy getTechnicianAssignmentStrategy() {
+        return HostelManagementSystem.getInstance().getTechnicianAssignmentStrategy();
     }
 
     @Override

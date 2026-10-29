@@ -8,6 +8,8 @@ import com.hostelhub.model.Room;
 import com.hostelhub.model.Technician;
 import com.hostelhub.model.User;
 import com.hostelhub.model.Visitor;
+import com.hostelhub.prototype.ComplaintPrototypeRegistry;
+import com.hostelhub.strategy.TechnicianAssignmentStrategy;
 
 import java.util.List;
 
@@ -61,6 +63,50 @@ public class HostelServiceProxy implements HostelService {
     @Override
     public Complaint createComplaint(ComplaintBuilder builder) {
         return createComplaint(builder.build());
+    }
+
+    // -------------------------------------------------------
+    // Prototype Pattern: Template operations & RBAC
+    // -------------------------------------------------------
+    @Override
+    public Complaint createComplaintFromTemplate(String templateKey, String customNote) {
+        if (!isAuthenticated()) {
+            throw new SecurityException("Access Denied: Please log in to file a complaint.");
+        }
+        return realService.createComplaintFromTemplate(templateKey, customNote);
+    }
+
+    @Override
+    public Complaint cloneComplaint(int complaintId, String customNote) {
+        if (!isAuthenticated()) {
+            throw new SecurityException("Access Denied: Authentication required.");
+        }
+        Complaint existing = realService.getComplaintById(complaintId);
+        if (existing == null) {
+            throw new IllegalArgumentException("Complaint #" + complaintId + " does not exist.");
+        }
+        // RBAC: Students can only clone their own complaints
+        if (isStudent() && existing.getStudentId() != currentUser.getId()) {
+            System.err.println("Proxy Security Violation: Student attempted to clone another student's complaint!");
+            throw new SecurityException("Access Denied: You cannot clone complaints raised by other students.");
+        }
+        return realService.cloneComplaint(complaintId, customNote);
+    }
+
+    @Override
+    public List<String> getAvailableComplaintTemplates() {
+        if (!isAuthenticated()) {
+            throw new SecurityException("Access Denied: Authentication required.");
+        }
+        return realService.getAvailableComplaintTemplates();
+    }
+
+    @Override
+    public ComplaintPrototypeRegistry getPrototypeRegistry() {
+        if (!isAuthenticated()) {
+            throw new SecurityException("Access Denied: Authentication required.");
+        }
+        return realService.getPrototypeRegistry();
     }
 
     @Override
@@ -123,6 +169,26 @@ public class HostelServiceProxy implements HostelService {
             throw new SecurityException("Access Denied: Only Wardens can view complaint history.");
         }
         return realService.getComplaintHistory();
+    }
+
+    // -------------------------------------------------------
+    // Strategy Pattern: Strategy configuration & RBAC
+    // -------------------------------------------------------
+    @Override
+    public void setTechnicianAssignmentStrategy(TechnicianAssignmentStrategy strategy) {
+        if (!isWarden()) {
+            System.err.println("Proxy Security Violation: Student attempted to change technician assignment strategy!");
+            throw new SecurityException("Access Denied: Only Wardens can change the technician assignment strategy.");
+        }
+        realService.setTechnicianAssignmentStrategy(strategy);
+    }
+
+    @Override
+    public TechnicianAssignmentStrategy getTechnicianAssignmentStrategy() {
+        if (!isAuthenticated()) {
+            throw new SecurityException("Access Denied: Authentication required.");
+        }
+        return realService.getTechnicianAssignmentStrategy();
     }
 
     @Override

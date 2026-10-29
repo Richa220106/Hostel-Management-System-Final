@@ -29,6 +29,23 @@ public class ComplaintBuilder {
         return new ComplaintBuilder();
     }
 
+    /**
+     * Prototype Pattern integration:
+     * Creates a ComplaintBuilder pre-populated with reusable attributes from a Complaint prototype.
+     */
+    public static ComplaintBuilder fromPrototype(Complaint prototype) {
+        ComplaintBuilder builder = new ComplaintBuilder();
+        if (prototype != null) {
+            builder.type(prototype.getType());
+            builder.department(prototype.getDepartment());
+            builder.description(prototype.getDescription());
+            builder.priority(prototype.getPriority());
+            builder.status("PENDING");
+            builder.roomNo(prototype.getRoomNo() != null ? prototype.getRoomNo() : "");
+        }
+        return builder;
+    }
+
     public ComplaintBuilder id(int id) {
         this.id = id;
         return this;

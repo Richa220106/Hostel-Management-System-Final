@@ -9,6 +9,9 @@ import com.hostelhub.model.Technician;
 import com.hostelhub.model.User;
 import com.hostelhub.model.Visitor;
 
+import com.hostelhub.prototype.ComplaintPrototypeRegistry;
+import com.hostelhub.strategy.TechnicianAssignmentStrategy;
+
 import java.util.List;
 
 public interface HostelService {
@@ -21,9 +24,19 @@ public interface HostelService {
     List<Complaint> getComplaints();
     Complaint getComplaintById(int id);
 
+    // Prototype operations: create from template or clone existing complaint
+    Complaint createComplaintFromTemplate(String templateKey, String customNote);
+    Complaint cloneComplaint(int complaintId, String customNote);
+    List<String> getAvailableComplaintTemplates();
+    ComplaintPrototypeRegistry getPrototypeRegistry();
+
     // Warden-only complaint actions
     void updateComplaintStatus(int complaintId, String status);
     void assignTechnician(int complaintId, int technicianId);
+
+    // Strategy operations: configure technician assignment policy
+    void setTechnicianAssignmentStrategy(TechnicianAssignmentStrategy strategy);
+    TechnicianAssignmentStrategy getTechnicianAssignmentStrategy();
 
     // Memento: restore and history (Warden only)
     Complaint restoreComplaintStatus(int complaintId);
