@@ -2,10 +2,11 @@ package com.hostelhub.factory;
 
 import com.hostelhub.builder.ComplaintBuilder;
 import com.hostelhub.memento.ComplaintMemento;
+import com.hostelhub.prototype.Prototype;
 
 import java.sql.Timestamp;
 
-public class Complaint {
+public class Complaint implements Prototype<Complaint>, Cloneable {
     private int id;
     private int studentId;
     private String studentName;
@@ -117,5 +118,74 @@ public class Complaint {
         if (memento.getDepartment() != null) this.department = memento.getDepartment();
         if (memento.getDescription() != null) this.description = memento.getDescription();
         if (memento.getPriority() != null) this.priority = memento.getPriority();
+    }
+
+    // -------------------------------------------------------
+    // Prototype Pattern integration
+    // -------------------------------------------------------
+    /**
+     * Prototype Pattern: Clones this complaint into a fresh complaint instance.
+     * Deep-copies the complaint template/core fields (type, department, description, priority),
+     * while correctly initializing and resetting runtime/identity fields:
+     * - id is reset to 0 (so database generates a new unique ID)
+     * - studentId is reset to 0
+     * - studentName is reset to null
+     * - roomNo is reset to empty string
+     * - status is reset to "PENDING" (never completed/resolved/assigned)
+     * - technicianId is reset to 0
+     * - technicianName is reset to null
+     * - createdAt & updatedAt are cleared to null
+     */
+    @Override
+    public Complaint clone() {
+        Complaint copy = new Complaint();
+        copy.setId(0);
+        copy.setType(this.type);
+        copy.setDepartment(this.department != null ? this.department : "General");
+        copy.setDescription(this.description);
+        copy.setPriority(this.priority != null ? this.priority : "MEDIUM");
+        copy.setStatus("PENDING");
+        copy.setStudentId(0);
+        copy.setStudentName(null);
+        copy.setRoomNo("");
+        copy.setTechnicianId(0);
+        copy.setTechnicianName(null);
+        copy.setCreatedAt(null);
+        copy.setUpdatedAt(null);
+        return copy;
+    }
+
+    /**
+     * Clones this complaint and specializes it for a specific student and room.
+     */
+    public Complaint cloneForStudent(int studentId, String roomNo) {
+        Complaint copy = this.clone();
+        copy.setStudentId(studentId);
+        copy.setRoomNo(roomNo != null ? roomNo : "");
+        return copy;
+    }
+
+    /**
+     * Clones this complaint, specializes it for a student and room, and optionally appends or overrides description details.
+     */
+    public Complaint cloneWith(int studentId, String roomNo, String customDescription) {
+        Complaint copy = this.cloneForStudent(studentId, roomNo);
+        if (customDescription != null && !customDescription.trim().isEmpty()) {
+            if (copy.getDescription() == null || copy.getDescription().trim().isEmpty()) {
+                copy.setDescription(customDescription.trim());
+            } else {
+                copy.setDescription(copy.getDescription() + " - " + customDescription.trim());
+            }
+        }
+        return copy;
+    }
+
+    /**
+     * Prototype and Builder integration:
+     * Converts this Complaint prototype into a ComplaintBuilder pre-populated with
+     * this prototype's core attributes, ready for fluent modifications.
+     */
+    public ComplaintBuilder toBuilder() {
+        return ComplaintBuilder.fromPrototype(this);
     }
 }

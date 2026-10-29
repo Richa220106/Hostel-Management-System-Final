@@ -12,12 +12,26 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.SQLException;
 
+import com.hostelhub.prototype.ComplaintPrototypeRegistry;
+import com.hostelhub.strategy.AvailabilityBasedAssignmentStrategy;
+import com.hostelhub.strategy.DepartmentBasedAssignmentStrategy;
+import com.hostelhub.strategy.TechnicianAssignmentStrategy;
+
 public class HostelManagementSystem {
     private static HostelManagementSystem instance;
     private ComplaintHandler complaintChain;
     private ComplaintManager complaintManager;
 
+    // Strategy Pattern: Configurable technician assignment strategy
+    private TechnicianAssignmentStrategy technicianAssignmentStrategy;
+
+    // Prototype Pattern: Central registry of complaint prototypes
+    private final ComplaintPrototypeRegistry prototypeRegistry;
+
     private HostelManagementSystem() {
+        this.technicianAssignmentStrategy = new DepartmentBasedAssignmentStrategy();
+        this.prototypeRegistry = new ComplaintPrototypeRegistry();
+
         // Initialize Chain of Responsibility
         ComplaintHandler emergency = new EmergencyHandler();
         ComplaintHandler maintenance = new MaintenanceHandler();
@@ -31,6 +45,9 @@ public class HostelManagementSystem {
         electrical.setNextHandler(plumbing);
         plumbing.setNextHandler(mess);
         
+        // Propagate active strategy to chain
+        emergency.setAssignmentStrategy(this.technicianAssignmentStrategy);
+
         this.complaintChain = emergency;
 
         // Initialize Observer Subject and attach observer
@@ -43,6 +60,24 @@ public class HostelManagementSystem {
             instance = new HostelManagementSystem();
         }
         return instance;
+    }
+
+    public TechnicianAssignmentStrategy getTechnicianAssignmentStrategy() {
+        return technicianAssignmentStrategy;
+    }
+
+    public void setTechnicianAssignmentStrategy(TechnicianAssignmentStrategy strategy) {
+        if (strategy != null) {
+            this.technicianAssignmentStrategy = strategy;
+            if (this.complaintChain != null) {
+                this.complaintChain.setAssignmentStrategy(strategy);
+            }
+            System.out.println("HostelManagementSystem: Technician assignment strategy updated to " + strategy.getStrategyName());
+        }
+    }
+
+    public ComplaintPrototypeRegistry getPrototypeRegistry() {
+        return prototypeRegistry;
     }
 
     public ComplaintManager getComplaintManager() {
